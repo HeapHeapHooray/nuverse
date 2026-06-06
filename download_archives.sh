@@ -391,22 +391,79 @@ for idx in "${SELECTED_INDICES[@]}"; do
     # Extract
     if tar -xzf "${TMP_DIR}/${name}" -C "$extract_path"; then
         echo -e "${GREEN}[+] Successfully unpacked ${name} into ${extract_path}!${NC}"
-        # Prefix subdirectories inside the extracted folder and symlink them to WORLDS_DIR
-        for sub in "$extract_path"/*; do
-            if [ -d "$sub" ]; then
-                sub_basename=$(basename "$sub")
-                if [[ "$sub_basename" != "${extract_folder_name}"* ]]; then
-                    mv "$sub" "${extract_path}/${extract_folder_name}_${sub_basename}"
-                    sub_basename="${extract_folder_name}_${sub_basename}"
+        # Find all directories containing level.dat, sorted by depth descending
+        declare -A seen_dirs
+        world_dirs=()
+        while IFS= read -r level_dat; do
+            [ -z "$level_dat" ] && continue
+            dir_name=$(dirname "$level_dat")
+            dir_abspath=$(realpath "$dir_name")
+            if [ -z "${seen_dirs[$dir_abspath]}" ]; then
+                seen_dirs[$dir_abspath]=1
+                world_dirs+=("$dir_name")
+            fi
+        done < <(find "$extract_path" -type f -iname "level.dat" | awk -F'/' '{print NF "\t" $0}' | sort -nr | cut -f2-)
+
+        if [ ${#world_dirs[@]} -eq 0 ]; then
+            echo -e "${YELLOW}[!] Warning: No level.dat found in the extracted files. Checking for any subdirectories...${NC}"
+            # Fallback to the old behavior: treat direct subdirectories as worlds
+            has_subdirs=false
+            for sub in "$extract_path"/*; do
+                if [ -d "$sub" ]; then
+                    has_subdirs=true
+                    sub_basename=$(basename "$sub")
+                    if [[ "$sub_basename" != "${extract_folder_name}"* ]]; then
+                        mv "$sub" "${extract_path}/${extract_folder_name}_${sub_basename}"
+                        sub_basename="${extract_folder_name}_${sub_basename}"
+                    fi
+                    mkdir -p "$WORLDS_DIR"
+                    echo -e "${BLUE}[*] Symlinking folder \"${sub_basename}\" into ${WORLDS_DIR}...${NC}"
+                    rm -rf "${WORLDS_DIR}/${sub_basename}"
+                    ln -sf "$(realpath --relative-to="$WORLDS_DIR" "${extract_path}/${sub_basename}")" "${WORLDS_DIR}/${sub_basename}"
+                fi
+            done
+            if [ "$has_subdirs" = false ]; then
+                # If there are no subdirectories either, symlink the extract_path itself
+                mkdir -p "$WORLDS_DIR"
+                echo -e "${BLUE}[*] Symlinking extract path \"${extract_folder_name}\" into ${WORLDS_DIR}...${NC}"
+                rm -rf "${WORLDS_DIR}/${extract_folder_name}"
+                ln -sf "$(realpath --relative-to="$WORLDS_DIR" "$extract_path")" "${WORLDS_DIR}/${extract_folder_name}"
+            fi
+        else
+            # Process the identified world directories
+            for world_dir in "${world_dirs[@]}"; do
+                world_dir_abspath=$(realpath "$world_dir")
+                extract_path_abspath=$(realpath "$extract_path")
+                
+                if [ "$world_dir_abspath" = "$extract_path_abspath" ]; then
+                    sub_basename="$extract_folder_name"
+                    target_world_path="$extract_path"
+                else
+                    sub_basename=$(basename "$world_dir")
+                    if [ "$sub_basename" = "$extract_folder_name" ]; then
+                        target_name="$extract_folder_name"
+                    elif [[ "$sub_basename" == "${extract_folder_name}"_* ]]; then
+                        target_name="$sub_basename"
+                    else
+                        target_name="${extract_folder_name}_${sub_basename}"
+                    fi
+                    
+                    target_world_path="${extract_path}/${target_name}"
+                    
+                    if [ "$world_dir_abspath" != "$(realpath "$target_world_path" 2>/dev/null)" ]; then
+                        echo -e "${BLUE}[*] Renaming and moving world folder \"${sub_basename}\" to \"${target_name}\"...${NC}"
+                        rm -rf "$target_world_path"
+                        mv "$world_dir" "$target_world_path"
+                    fi
+                    sub_basename="$target_name"
                 fi
                 
-                # Symlink to WORLDS_DIR
                 mkdir -p "$WORLDS_DIR"
                 echo -e "${BLUE}[*] Symlinking world folder \"${sub_basename}\" into ${WORLDS_DIR}...${NC}"
                 rm -rf "${WORLDS_DIR}/${sub_basename}"
-                ln -sf "$(realpath --relative-to="$WORLDS_DIR" "${extract_path}/${sub_basename}")" "${WORLDS_DIR}/${sub_basename}"
-            fi
-        done
+                ln -sf "$(realpath --relative-to="$WORLDS_DIR" "$target_world_path")" "${WORLDS_DIR}/${sub_basename}"
+            done
+        fi
     else
         echo -e "${RED}[!] Error: Failed to unpack ${name}.${NC}"
     fi

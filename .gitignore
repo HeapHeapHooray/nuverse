@@ -1,0 +1,5 @@
+# Ignore downloaded map archives and their unpacked contents
+downloaded_archives/
+
+# Ignore local symbolic links to world folders
+worlds/
