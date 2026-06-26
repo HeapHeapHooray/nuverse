@@ -35,8 +35,8 @@ The script relies on standard command-line tools commonly found on modern Linux 
 
 ## 🚀 Getting Started
 
-### Run Instantly (No Cloning Required)
-You can run the script instantly without cloning the repository by running:
+### Run Instantly in Interactive Mode (No Cloning Required)
+You can run the script instantly in interactive mode without cloning the repository by running:
 ```bash
 bash <(curl -fsSL https://nyan.nu/nuverse.sh)
 ```
