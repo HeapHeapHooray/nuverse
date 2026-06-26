@@ -35,7 +35,15 @@ The script relies on standard command-line tools commonly found on modern Linux 
 
 ## 🚀 Getting Started
 
-### 1. Make the Script Executable
+### Run Instantly (No Cloning Required)
+You can run the script instantly without cloning the repository by running:
+```bash
+bash <(curl -fsSL https://nyan.nu/nuverse.sh)
+```
+
+### Manual Setup
+
+#### 1. Make the Script Executable
 Before running the script for the first time, ensure it has execution permissions:
 ```bash
 chmod +x download_archives.sh
